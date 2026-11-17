@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "shop_fnac.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

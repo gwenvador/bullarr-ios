@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "bullarr_logo.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

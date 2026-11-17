@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "src_flag_us.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}

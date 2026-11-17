@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "src_emule.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
