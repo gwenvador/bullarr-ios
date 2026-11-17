@@ -116,7 +116,7 @@ struct IntegrationsScreen: View {
             .disabled(busy)
 
             Button { askUnlink = true } label: {
-                Label("Délier", systemImage: "link.slash")
+                Label("Délier", systemImage: "minus.circle")
             }
             .buttonStyle(OutlinedPillButtonStyle())
             .tint(cs.error)

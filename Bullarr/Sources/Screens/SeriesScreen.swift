@@ -341,7 +341,7 @@ private struct SeriesScreenInner: View {
                         }
                     }
                 } label: {
-                    Label("Recherche automatique", systemImage: "dot.radar")
+                    Label("Recherche automatique", systemImage: "dot.radiowaves.left.and.right")
                 }
             } label: {
                 Image(systemName: "globe").frame(width: 32, height: 32)
@@ -1758,7 +1758,7 @@ private struct AuthorAlbumsSheet: View {
                             Button {
                                 addSelected()
                             } label: {
-                                Image(systemName: "books.vertical.badge.plus").foregroundColor(cs.accent)
+                                Image(systemName: "rectangle.stack.badge.plus").foregroundColor(cs.accent)
                             }
                             .accessibilityLabel("Ajouter la sélection")
                         }
@@ -1801,7 +1801,7 @@ private struct AuthorAlbumsSheet: View {
                                     Button {
                                         addAlbum(index, a)
                                     } label: {
-                                        Image(systemName: "books.vertical.badge.plus").foregroundColor(cs.accent).padding(.leading, 8)
+                                        Image(systemName: "rectangle.stack.badge.plus").foregroundColor(cs.accent).padding(.leading, 8)
                                     }
                                     .accessibilityLabel("Ajouter cette série")
                                 }
@@ -1845,16 +1845,19 @@ private struct AuthorAlbumsSheet: View {
         if selected.contains(index) { selected.remove(index) } else { selected.insert(index) }
     }
 
-    private func add(_ index: Int, _ a: JSONDict) async throws {
+    @discardableResult
+    private func add(_ index: Int, _ a: JSONDict) async throws -> Int? {
         guard let api = state.api else { throw ApiException("Non connecté.") }
-        let libraryId = state.selectedLibrary?.id ?? state.libraries.first?.id
+        var libraryId = state.selectedLibrary?.id ?? state.libraries.first?.id
+        if libraryId == nil { libraryId = parseLibraries(try await api.getArray("api/libraries")).first?.id }
         guard let libraryId else { throw ApiException("Aucune bibliothèque disponible") }
         var body: JSONDict = ["library_id": libraryId]
         if let url = a.str("bedetheque_url") { body["url"] = url }
         pending.insert(index)
         defer { pending.remove(index) }
-        _ = try await api.postObject("api/bedetheque/add-series", body)
+        let res = try await api.postObject("api/bedetheque/add-series", body)
         if let url = a.str("bedetheque_url") { state.markAdded(url) }
+        return res.int("series_id")
     }
 
     private func addSelected() {
@@ -1876,7 +1879,13 @@ private struct AuthorAlbumsSheet: View {
     private func addAlbum(_ index: Int, _ a: JSONDict) {
         let title = a.str("title") ?? "(sans titre)"
         launchAction("« \(title) » ajoutée") {
-            try await add(index, a)
+            // Comme Android : la fiche de la série ajoutée s'ouvre.
+            if let id = try await add(index, a) {
+                await MainActor.run {
+                    dismiss()
+                    state.openSeriesById(id, title)
+                }
+            }
         }
     }
 }

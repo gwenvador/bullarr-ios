@@ -75,6 +75,22 @@ final class ImportInfo: ObservableObject {
             // L'état reste celui du dernier sondage ; pas d'erreur bloquante ici.
         }
     }
+
+    /// Annule le fichier en cours d'import (il repasse en import manuel) ; la pause n'est pas touchée.
+    /// Renvoie false s'il n'y avait aucun import actif.
+    func cancel() async throws -> Bool {
+        guard let api = apiProvider() else { throw ApiException("Non connecté.") }
+        let r = try await api.postObject("api/import/cancel", [:])
+        await pollFast()
+        return r.bool("cancelling") == true
+    }
+
+    /// Relance l'import automatique mis en pause.
+    func resume() async throws {
+        guard let api = apiProvider() else { throw ApiException("Non connecté.") }
+        _ = try await api.postObject("api/import/resume", [:])
+        await pollFast()
+    }
 }
 
 /// Boucle de sondage tant que l'écran est visible (équivalent de Polling d'Android) :
@@ -90,6 +106,15 @@ func pollLoop(_ seconds: UInt64, _ block: @escaping () async -> Void) async {
 struct ImportStatusCard: View {
     @Environment(\.bullColors) private var cs
     let info: ImportInfo
+    @State private var sending = false
+
+    private func run(_ block: @escaping () async throws -> String) {
+        sending = true
+        Task {
+            do { ToastCenter.shared.show(try await block()) } catch { ToastCenter.shared.show(readable(error)) }
+            sending = false
+        }
+    }
 
     var body: some View {
         if let error = info.error {
@@ -113,7 +138,24 @@ struct ImportStatusCard: View {
                         Text("Import en préparation").font(.headline)
                     }
                     if p.paused {
-                        TagView(text: "Import arrêté (mis en pause)", container: cs.tertiaryContainer, content: cs.tertiaryOnContainer)
+                        TagView(text: "Import automatique en pause : aucun nouveau fichier n'est pris", container: cs.tertiaryContainer, content: cs.tertiaryOnContainer)
+                    }
+                    if p.processingFile != nil || p.paused {
+                        HStack(spacing: 8) {
+                            if p.processingFile != nil {
+                                Button("Annuler l'import", role: .destructive) {
+                                    run { try await info.cancel() ? "Import annulé : le fichier repasse en import manuel" : "Aucun import actif à annuler" }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            if p.paused {
+                                Button("Reprendre l'import") {
+                                    run { try await info.resume(); return "Import automatique repris" }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .disabled(sending)
                     }
                     if !p.claimedFiles.isEmpty && p.processingFile == nil {
                         Text("Fichiers réservés par l'import (\(p.claimedFiles.count))").font(.headline).padding(.top, 6)

@@ -42,6 +42,8 @@ func logoAsset(_ key: String) -> String {
     case "comics", "usa": return "src_flag_us"
     case "manga", "asie": return "src_flag_japan"
     case "annas_archive": return "src_annas_archive"
+    case "bedetheque": return "bedetheque_logo"
+    case "fnac", "amazon", "bdfugue": return "shop_\(key)"
     default: return "src_\(key)"
     }
 }

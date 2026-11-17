@@ -347,7 +347,7 @@ private struct LibraryScreenInner: View {
             addQuery = state.query.trimmed
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: "books.vertical.badge.plus")
+                Image(systemName: "rectangle.stack.badge.plus")
                     .font(.system(size: 20))
                     .foregroundColor(cs.accent)
                 Text((state.isReader ? "Demander « " : "Ajouter « ") + "\(state.query.trimmed) »")

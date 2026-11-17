@@ -329,49 +329,54 @@ private struct EnrichView: View {
     private func discoveryRow(_ d: Discovery) -> some View {
         let inLibrary = d.inLibrary || (d.url.map { state.addedBedethequeUrls.contains($0) } ?? false)
         let busy = d.url.map { adding.contains($0) } ?? false
-        return Button {
-            if let sid = d.seriesId {
-                openSeries(sid, d.title)
-            } else if let url = d.url {
-                openInBrowser(url)
+        // Le bouton « + » est à côté de la ligne, pas dans son libellé : un bouton imbriqué ne reçoit pas toujours l'appui.
+        return HStack(spacing: 0) {
+            Button {
+                if let sid = d.seriesId {
+                    openSeries(sid, d.title)
+                } else if let url = d.url {
+                    openInBrowser(url)
+                }
+            } label: {
+                HStack(spacing: 0) {
+                    if let r = d.rank {
+                        Text("\(r)").font(.headline).foregroundColor(cs.accent).frame(width: 36, alignment: .leading)
+                    }
+                    if d.cover != nil {
+                        Cover(url: d.cover, width: 44).padding(.trailing, 12)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(d.title).font(.subheadline.weight(.medium)).foregroundColor(cs.text)
+                        if let m = d.meta {
+                            Text(m).font(.caption).foregroundColor(cs.muted).lineLimit(2)
+                        }
+                        if let s = d.summary {
+                            Text(s).font(.caption).foregroundColor(cs.text.opacity(0.8)).lineLimit(2)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.leading, 16)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
             }
-        } label: {
-            HStack(spacing: 0) {
-                if let r = d.rank {
-                    Text("\(r)").font(.headline).foregroundColor(cs.accent).frame(width: 36, alignment: .leading)
+            .buttonStyle(.plain)
+            if inLibrary {
+                IconTag(icon: "books.vertical.fill", label: "En bibliothèque", tint: cs.tertiary).padding(.trailing, 4)
+            } else if d.url != nil {
+                Button { add(d) } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 17))
+                        .foregroundColor(busy ? cs.muted : cs.accent)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                if d.cover != nil {
-                    Cover(url: d.cover, width: 44).padding(.trailing, 12)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(d.title).font(.subheadline.weight(.medium)).foregroundColor(cs.text)
-                    if let m = d.meta {
-                        Text(m).font(.caption).foregroundColor(cs.muted).lineLimit(2)
-                    }
-                    if let s = d.summary {
-                        Text(s).font(.caption).foregroundColor(cs.text.opacity(0.8)).lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if inLibrary {
-                    IconTag(icon: "books.vertical.fill", label: "En bibliothèque", tint: cs.tertiary).padding(.trailing, 4)
-                } else if d.url != nil {
-                    Button { add(d) } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17))
-                            .foregroundColor(busy ? cs.muted : cs.accent)
-                            .frame(width: 36, height: 36)
-                    }
-                    .disabled(busy)
-                    .accessibilityLabel("Ajouter à la bibliothèque")
-                }
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .accessibilityLabel("Ajouter à la bibliothèque")
             }
-            .padding(.leading, 16)
-            .padding(.trailing, 4)
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .padding(.trailing, 4)
     }
 
     private func add(_ d: Discovery) {
@@ -380,10 +385,14 @@ private struct EnrichView: View {
         Task {
             defer { adding.remove(url) }
             do {
-                let lib = state.selectedLibrary ?? state.libraries.first
+                // Bibliothèques pas encore chargées (Actions ouvert avant la Bibliothèque) : les demander, comme Android.
+                var lib = state.selectedLibrary ?? state.libraries.first
+                if lib == nil { lib = parseLibraries(try await api.getArray("api/libraries")).first }
                 guard let lib else { throw ApiException("Aucune bibliothèque") }
                 let o = try await api.postObject("api/bedetheque/add-series", ["url": url, "library_id": lib.id])
                 state.markAdded(url)
+                // Comme Android : la fiche de la série ajoutée s'ouvre (le message reste visible).
+                if let sid = o.int("series_id") { openSeries(sid, d.title) }
                 ToastCenter.shared.show(o.bool("already_exists") == true
                     ? "« \(d.title) » est déjà dans \(lib.name)."
                     : "« \(d.title) » ajoutée à \(lib.name).")
