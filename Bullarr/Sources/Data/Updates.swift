@@ -1,6 +1,6 @@
 import Foundation
 
-/// Release publiée sur GitHub (pièce jointe d'une release nommée bullarr-android-<version>.apk).
+/// Release publiée sur GitHub (pièce jointe d'une release nommée bullarr-ios-<version>.ipa).
 struct AppRelease: Hashable {
     let version: String
     let url: String
@@ -18,14 +18,12 @@ enum UpdateState: Equatable {
 }
 
 /**
- * Cherche la dernière version de l'app dans les releases GitHub (API publique, sans clé).
- * Les deux dépôts sont consultés : les APK peuvent être joints aux releases de l'app ou à
- * celles de Bullarr (voir README).
+ * Cherche la dernière version de l'app iOS dans les releases GitHub de bullarr-ios
+ * (API publique, sans clé) : l'IPA jointe se nomme bullarr-ios-<version>.ipa.
  */
 enum UpdateChecker {
-    static let repos = ["gwenvador/bullarr-android", "gwenvador/bullarr"]
-    /// Pour l'iOS, l'app cherchera des .ipa jointes (bullarr-ios-<version>.ipa) ; on garde l'APK au cas où rien n'existe.
-    static let assetPattern = try! NSRegularExpression(pattern: "^bullarr-(?:android|ios)-(\\d+(?:\\.\\d+)*)\\.(?:apk|ipa)$")
+    static let repos = ["gwenvador/bullarr-ios"]
+    static let assetPattern = try! NSRegularExpression(pattern: "^bullarr-ios-(\\d+(?:\\.\\d+)*)\\.ipa$")
 
     static func latest() async throws -> AppRelease? {
         var best: AppRelease?

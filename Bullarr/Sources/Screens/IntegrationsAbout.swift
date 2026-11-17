@@ -275,7 +275,7 @@ struct UpdateCard: View {
             .font(.subheadline.weight(.medium)).foregroundColor(cs.tertiary)
         Button { openInBrowser(r.page ?? r.url) } label: { Text("Voir la version") }
             .buttonStyle(AccentPillButtonStyle())
-        Text("Sur iOS, l'app se met à jour via Xcode ou TestFlight ; la page de la version détaille les changements.")
+        Text("Installez l'IPA de la version avec AltStore, SideStore ou Sideloadly, ou recompilez avec Xcode ; la page de la version détaille les changements.")
             .font(.caption).foregroundColor(cs.muted)
     }
 }
