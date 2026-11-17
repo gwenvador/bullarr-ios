@@ -71,10 +71,11 @@ puis **Product → Run** à nouveau dans Xcode.
 
 ### Avec un fichier .ipa (AltStore, SideStore, Sideloadly)
 
-Si vous avez un fichier `.ipa` de Bullarr, des outils comme [AltStore](https://altstore.io),
-[SideStore](https://sidestore.io) ou [Sideloadly](https://sideloadly.io) le re-signent avec votre
-identifiant Apple et l'installent sans Xcode. Pour fabriquer ce fichier depuis le code :
-**Product → Archive** dans Xcode, puis **Distribute App → Custom → Debugging**.
+Sans Mac ni Xcode : téléchargez `bullarr-ios-<version>.ipa` (non signée) depuis les
+[releases](https://github.com/gwenvador/bullarr-ios/releases/latest), puis installez-la avec
+[AltStore](https://altstore.io), [SideStore](https://sidestore.io) ou
+[Sideloadly](https://sideloadly.io), qui la signent avec votre identifiant Apple. La limite des
+7 jours du compte gratuit s'applique aussi ; AltStore et SideStore renouvellent l'app automatiquement.
 
 ## Premier lancement
 
