@@ -14,10 +14,12 @@ struct LibraryFilters: Equatable {
     /// Listes personnelles : clés de LIST_LABELS (« to-read », « favorite »).
     var lists: Set<String> = []
     var tags: Set<String> = []
+    /// Lecture : clés de READ_LABELS (« read », « reading », « unread »).
+    var reads: Set<String> = []
 
     var activeCount: Int {
         types.count + origins.count + genres.count + decades.count + updated.count +
-            volumes.count + sizes.count + votes.count + lists.count + tags.count
+            volumes.count + sizes.count + votes.count + lists.count + tags.count + reads.count
     }
     var isEmpty: Bool { activeCount == 0 }
 
@@ -28,6 +30,7 @@ struct LibraryFilters: Equatable {
             (updated.isEmpty || updated.contains { updatedMatches($0, s, now) }) &&
             (genres.isEmpty || s.genres.contains { genres.contains($0) }) &&
             (lists.isEmpty || lists.contains { listMatches($0, s) }) &&
+            (reads.isEmpty || reads.contains(readStateOf(s))) &&
             (tags.isEmpty || s.tags.contains { tags.contains($0) }) &&
             (votes.isEmpty || votes.contains { voteBucket($0, s.votes) }) &&
             (volumes.isEmpty || volumes.contains { volumeBucket($0, s.volumeCount) }) &&
@@ -46,6 +49,14 @@ let VOLUME_LABELS: [(String, String)] = [("0", "Aucun (masquées par défaut)"),
 let VOTE_LABELS: [(String, String)] = [("0", "Aucun vote"), ("1-10", "1 à 10"), ("11-50", "11 à 50"), ("51-100", "51 à 100"), ("100+", "Plus de 100")]
 let SIZE_LABELS: [(String, String)] = [("<100", "< 100 Mo"), ("100-500", "100 à 500 Mo"), ("500-1000", "500 Mo à 1 Go"), ("1-5", "1 à 5 Go"), (">5", "> 5 Go")]
 let LIST_LABELS: [(String, String)] = [("to-read", "À lire plus tard"), ("favorite", "Favoris")]
+
+let READ_LABELS: [(String, String)] = [("read", "Lu"), ("reading", "En cours"), ("unread", "Non lu")]
+
+/// Comme le site : tout lu = « Lu », un tome lu ou commencé = « En cours », sinon (ou sans tome suivi) « Non lu ».
+func readStateOf(_ s: SeriesSummary) -> String {
+    if s.readTotal == 0 || s.readCount + s.readingCount == 0 { return "unread" }
+    return s.readCount >= s.readTotal ? "read" : "reading"
+}
 
 func listMatches(_ key: String, _ s: SeriesSummary) -> Bool {
     switch key {

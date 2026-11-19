@@ -28,6 +28,8 @@ private struct ValidationView: View {
     @State private var loading = false
     @State private var expanded: Set<String> = []
     @State private var sending: Set<String> = []
+    /// Filtre des fichiers trouvés, par tome à valider (id de la revue).
+    @State private var filters: [Int: String] = [:]
 
     var body: some View {
         ScrollView {
@@ -165,6 +167,11 @@ private struct ValidationView: View {
     /// Un tome à valider : raison, candidats et leur bouton de téléchargement.
     private func reviewEntry(_ r: JSONDict, id: Int, showHeader: Bool) -> some View {
         let candidates = r.objects("candidates").enumerated().map { $0 }
+        let words = reviewFilterNormalize(filters[id] ?? "").split(separator: " ").map(String.init)
+        let visible = words.isEmpty ? candidates : candidates.filter { _, c in
+            let text = reviewFilterNormalize((c.str("filename") ?? c.str("title")).map(decodeName) ?? "")
+            return words.allSatisfy { text.contains($0) }
+        }
         return VStack(alignment: .leading, spacing: 6) {
             if showHeader {
                 Divider()
@@ -182,9 +189,32 @@ private struct ValidationView: View {
             if let reason = r.str("reason") {
                 Text(reason).font(.caption).foregroundColor(cs.muted)
             }
-            ForEach(Array(candidates), id: \.offset) { i, c in
+            // « une recherche par album à valider » : filtre les fichiers trouvés de cet album
+            // pour repérer le bon (tous les mots, sans accents ni ligatures), comme sur le site.
+            if candidates.count > 1 {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").font(.system(size: 13)).foregroundColor(cs.muted)
+                    TextField("Filtrer les fichiers de cet album", text: Binding(
+                        get: { filters[id] ?? "" }, set: { filters[id] = $0 }))
+                        .font(.subheadline)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if !(filters[id] ?? "").isEmpty {
+                        Button { filters[id] = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(cs.muted)
+                        }
+                        .accessibilityLabel("Effacer le filtre")
+                    }
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(cs.outlineVariant, lineWidth: 1))
+            }
+            ForEach(Array(visible), id: \.offset) { i, c in
                 let idx = c.int("candidate_index") ?? i
                 candidateRow(c, id: id, idx: idx)
+            }
+            if !words.isEmpty && visible.isEmpty {
+                Text("Aucun fichier ne correspond.").font(.caption).foregroundColor(cs.muted)
             }
         }
     }
@@ -197,7 +227,7 @@ private struct ValidationView: View {
             .joined(separator: " · ")
         return HStack(alignment: .center, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(c.str("filename") ?? c.str("title") ?? "(sans nom)")
+                Text((c.str("filename") ?? c.str("title")).map(decodeName) ?? "(sans nom)")
                     .font(.subheadline).foregroundColor(cs.text).lineLimit(3)
                 if !meta.isEmpty {
                     Text(meta).font(.caption).foregroundColor(cs.muted)
@@ -234,4 +264,9 @@ private struct ValidationView: View {
             }
         }
     }
+}
+
+private func reviewFilterNormalize(_ s: String) -> String {
+    normalize(s.replacingOccurrences(of: "[–—]", with: " ", options: .regularExpression))
+        .trimmingCharacters(in: .whitespaces)
 }

@@ -546,6 +546,8 @@ struct SeriesCell: View {
             GeometryReader { geo in
                 ZStack(alignment: .topTrailing) {
                     Cover(url: cover, width: geo.size.width)
+                        .overlay(alignment: .bottom) { ReadProgressBar(s: s) }
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
                                 .strokeBorder(selected ? cs.accent : Color.clear, lineWidth: 3)
@@ -675,6 +677,8 @@ struct SeriesRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Cover(url: cover, width: 52)
+                .overlay(alignment: .bottom) { ReadProgressBar(s: s, height: 3) }
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             Spacer(minLength: 16)
             VStack(alignment: .leading, spacing: 3) {
                 Text(s.title)
@@ -746,5 +750,27 @@ extension View {
                 value: -geo.frame(in: .named(space)).minY
             )
         })
+    }
+}
+
+/// Barre de lecture en bas de la miniature, comme sur le site : affichée dès qu'un tome est lu
+/// ou commencé, remplie à la part lue (pages des tomes commencés comprises).
+private struct ReadProgressBar: View {
+    @Environment(\.bullColors) private var cs
+    let s: SeriesSummary
+    var height: CGFloat = 4
+
+    var body: some View {
+        if s.readTotal > 0 && s.readCount + s.readingCount > 0 {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Rectangle().fill(Color.white.opacity(0.35))
+                    Rectangle().fill(cs.accent)
+                        .frame(width: geo.size.width * min(1, CGFloat(s.readUnits) / CGFloat(s.readTotal)))
+                }
+            }
+            .frame(height: height)
+            .accessibilityLabel("\(s.readCount)/\(s.readTotal) lus")
+        }
     }
 }

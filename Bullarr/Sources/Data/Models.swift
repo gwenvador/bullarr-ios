@@ -122,6 +122,12 @@ struct SeriesSummary: Identifiable, Hashable {
     /// Listes personnelles : « à lire plus tard » et « favori ».
     var toReadLater: Bool = false
     var isFavorite: Bool = false
+    /// Avancement de lecture des tomes possédés (komga_book/read/reading_count).
+    var readTotal: Int = 0
+    var readCount: Int = 0
+    var readingCount: Int = 0
+    /// Tomes lus, pages des tomes commencés comprises (komga_read_units) : T1 lu + T2 65/67 = 1,97.
+    var readUnits: Double = 0
     /// Recherche par nom (titre, auteur, univers) et par tags, séparément.
     var nameKey: String = ""
     var tagsKey: String = ""
@@ -179,6 +185,10 @@ func parseSeriesList(_ a: [Any]) -> [SeriesSummary] {
             tags: tags,
             toReadLater: it.bool("to_read_later") == true,
             isFavorite: it.bool("is_favorite") == true,
+            readTotal: it.int("komga_book_count") ?? 0,
+            readCount: it.int("komga_read_count") ?? 0,
+            readingCount: it.int("komga_reading_count") ?? 0,
+            readUnits: (it["komga_read_units"] as? NSNumber)?.doubleValue ?? Double(it.int("komga_read_count") ?? 0),
             nameKey: normalize("\(title) \(author ?? "") \(it.str("universe_name") ?? "")"),
             tagsKey: normalize(tags.map { "\($0) \($0.replacingOccurrences(of: "-", with: " "))" }.joined(separator: " ")),
         )
@@ -418,7 +428,13 @@ struct SearchResult: Identifiable {
 }
 
 func decodeName(_ s: String) -> String {
-    s.replacingOccurrences(of: "+", with: "%2B").removingPercentEncoding ?? s
+    // %20 et autres encodages d'URL, puis entités HTML (comme le site, validation.js).
+    var out = s.replacingOccurrences(of: "+", with: "%2B").removingPercentEncoding ?? s
+    for (entity, char) in [("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""),
+                           ("&#039;", "'"), ("&#39;", "'"), ("&apos;", "'")] {
+        out = out.replacingOccurrences(of: entity, with: char)
+    }
+    return out
 }
 
 func parseSearchResults(_ o: JSONDict) -> [SearchResult] {

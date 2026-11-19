@@ -53,7 +53,11 @@ private struct NewsScreenInner: View {
     @State private var hasMoreEbdz = false
     @State private var loadingMore = false
     @State private var genres: [String: GenreInfo] = [:]
+    /// Genre, années, tomes, parution : lus par le serveur dans la même fiche que l'origine.
+    @State private var metas: [String: [String]] = [:]
     @State private var genreFilter: String? = nil
+    /// Possession : nil = tout, true = possédés (ou déjà téléchargés), false = non possédés.
+    @State private var ownedFilter: Bool? = nil
     @State private var countriesOpen = false
     @State private var searchOpen = false
     @State private var query = ""
@@ -69,6 +73,7 @@ private struct NewsScreenInner: View {
         for t in shownTypes { list.append(contentsOf: feeds[t] ?? []) }
         list = list.filter { item in
             if let gf = genreFilter, genreOf(item) != gf { return false }
+            if let of = ownedFilter, newsIsOwned(item) != of { return false }
             if !q.isEmpty {
                 let hay = normalize([item.title, item.subtitle, item.seriesTitle].compactMap { $0 }.joined(separator: " "))
                 if !hay.contains(q) { return false }
@@ -223,6 +228,12 @@ private struct NewsScreenInner: View {
                 if searchOpen {
                     CompactSearchField(value: $query, placeholder: "Titre ou série")
                 } else {
+                    // Possession : un appui passe de Tout à Possédés, puis Non possédés, puis Tout.
+                    FilterChip(selected: ownedFilter != nil) {
+                        switch ownedFilter { case nil: ownedFilter = true; case true?: ownedFilter = false; case false?: ownedFilter = nil }
+                    } label: {
+                        Text(ownedFilter == nil ? "Possession" : (ownedFilter == true ? "Possédés" : "Non possédés"))
+                    }
                     Spacer()
                 }
             }
@@ -299,15 +310,16 @@ private struct NewsScreenInner: View {
                         NewsRow(
                             downloads: downloads, item: first, showType: tab == 0,
                             genre: genreOf(first), onOpenSeries: openSeries,
-                            onPickSeries: { pickFor = $0 }
+                            onPickSeries: { pickFor = $0 },
+                            bdtTags: first.bedethequeUrl.flatMap { metas[$0] } ?? []
                         )
                         Divider()
                     } else {
                         let groupId = "\(newsGroupKey(first) ?? "")|\(first.date ?? "")"
                         let open = expandedGroups.contains(groupId)
                         NewsGroupRow(
-                            first: first, count: members.count, showType: tab == 0,
-                            genre: genreOf(first), expanded: open,
+                            first: first, count: members.count, ownedCount: members.filter(newsIsOwned).count, showType: tab == 0,
+                            genre: genreOf(first), bdtTags: first.bedethequeUrl.flatMap { metas[$0] } ?? [], expanded: open,
                             onToggle: {
                                 if open { expandedGroups.remove(groupId) } else { expandedGroups.insert(groupId) }
                             }
@@ -457,6 +469,8 @@ private struct NewsScreenInner: View {
                 guard let d = val as? JSONDict else { continue }
                 let k = d.str("kind")
                 genres[url] = (k?.isEmpty == false) ? .kind(k!) : .noKind
+                let tags = bdtMetaTags(d.dict("meta"))
+                if !tags.isEmpty { metas[url] = tags }
             }
             if answered.isEmpty && (o.int("pending") ?? 0) == 0 {
                 for url in batch where genres[url] == nil { genres[url] = .noKind }
@@ -488,6 +502,7 @@ private struct NewsRow: View {
     let onPickSeries: (NewsItem) -> Void
     var hideDate: Bool = false
     var nested: Bool = false
+    var bdtTags: [String] = []
 
     /// Lien copiable du premier fichier (ed2k / torrent / vk) ; les autres n'en ont pas.
     private var copyable: String? {
@@ -513,6 +528,8 @@ private struct NewsRow: View {
                         .lineLimit(2)
                     GenreFlag(genre: genre)
                 }
+                // Tags Bédéthèque sous le nom de la série (pas sur les albums d'un groupe déplié).
+                if !nested { BdtTags(tags: bdtTags) }
                 if item.subtitle != nil && !nested {
                     Text(item.title).font(.caption).foregroundColor(cs.muted).lineLimit(2)
                 }
@@ -520,6 +537,9 @@ private struct NewsRow: View {
                     SourceLine(item: item, showType: showType, hideDate: hideDate)
                     if item.owned {
                         TagView(text: "Possédé", container: cs.accentContainer, content: cs.accentOnContainer)
+                    } else if item.downloaded {
+                        // Fichier Telegram / RSS déjà téléchargé (le site affiche « Déjà téléchargé »).
+                        TagView(text: "Téléchargé", container: cs.accentContainer, content: cs.accentOnContainer)
                     } else if item.inLibrary {
                         TagView(text: "Série suivie", container: cs.secondaryContainer, content: cs.accentOnContainer)
                     }
@@ -603,13 +623,18 @@ private struct NewsRow: View {
     }
 }
 
+/// Album possédé, ou fichier Telegram / RSS déjà téléchargé.
+func newsIsOwned(_ item: NewsItem) -> Bool { item.owned || item.downloaded }
+
 /// Ligne « série » d'un groupe replié : nom, nombre d'albums, date / type / origine du plus récent.
 private struct NewsGroupRow: View {
     @Environment(\.bullColors) private var cs
     let first: NewsItem
     let count: Int
+    let ownedCount: Int
     let showType: Bool
     let genre: String?
+    let bdtTags: [String]
     let expanded: Bool
     let onToggle: () -> Void
 
@@ -622,8 +647,15 @@ private struct NewsGroupRow: View {
                         .lineLimit(2)
                     GenreFlag(genre: genre)
                 }
+                BdtTags(tags: bdtTags)
                 HStack(spacing: 8) {
                     TagView(text: "\(count) albums", container: cs.secondaryContainer, content: cs.accentOnContainer)
+                    // Possession visible sans déplier le groupe.
+                    if ownedCount == count {
+                        TagView(text: "Tous possédés", container: cs.accentContainer, content: cs.accentOnContainer)
+                    } else if ownedCount > 0 {
+                        TagView(text: "\(ownedCount) possédés", container: cs.accentContainer, content: cs.accentOnContainer)
+                    }
                     SourceLine(item: first, showType: showType, hideDate: false, withSize: false)
                 }
             }
@@ -637,6 +669,41 @@ private struct NewsGroupRow: View {
         .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture { onToggle() }
+    }
+}
+
+/// « genre:Aventure », « 2019–2024 », « 5 tomes », « Série en cours » depuis le « meta » de /api/bedetheque/origins.
+func bdtMetaTags(_ meta: JSONDict?) -> [String] {
+    guard let meta else { return [] }
+    let genres = (meta.str("genre") ?? "").split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.map { "genre:\($0)" }
+    var rest: [String] = []
+    if let start = meta.int("year_start"), start > 0 {
+        if let end = meta.int("year_end"), end > 0, end != start { rest.append("\(start)–\(end)") } else { rest.append("\(start)") }
+    }
+    if let n = meta.int("total_volumes"), n > 0 { rest.append("\(n) tome\(n > 1 ? "s" : "")") }
+    if let status = meta.str("status"), !status.isEmpty { rest.append(status) }
+    return genres + rest
+}
+
+/// Tags Bédéthèque : genres en couleur, puis années, tomes et parution.
+private struct BdtTags: View {
+    @Environment(\.bullColors) private var cs
+    let tags: [String]
+
+    var body: some View {
+        if !tags.isEmpty {
+            FlowRow(spacing: 4) {
+                ForEach(Array(tags.enumerated()), id: \.offset) { _, t in
+                    if t.hasPrefix("genre:") {
+                        TagView(text: String(t.dropFirst(6)), container: cs.tertiaryContainer, content: cs.tertiaryOnContainer)
+                    } else {
+                        TagView(text: t, container: cs.alt, content: cs.muted)
+                    }
+                }
+            }
+            .padding(.top, 2)
+        }
     }
 }
 

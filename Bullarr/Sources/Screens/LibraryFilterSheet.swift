@@ -55,6 +55,10 @@ struct LibraryFilterSheet: View {
                     selected: filters.lists,
                     count: { k in all.count { listMatches(k, $0) } },
                     set: { filters.lists = $0 })
+        OptionGroup(title: "Lecture", options: READ_LABELS.map { ($0.0, $0.1) },
+                    selected: filters.reads,
+                    count: { k in all.count { readStateOf($0) == k } },
+                    set: { filters.reads = $0 })
         // Beaucoup de tags : seule une partie est affichée, la recherche trouve le reste.
         if !tagCounts.isEmpty { tagsGroup }
     }

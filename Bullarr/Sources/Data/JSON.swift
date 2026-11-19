@@ -143,10 +143,17 @@ extension NSNumber {
     var asBool: Bool { boolValue }
 }
 
-/// Minuscules sans accents, pour une recherche tolérante (equivalent de normalize()).
+/// Minuscules sans accents, pour une recherche tolérante (equivalent de normalize()) :
+/// « Sœur.Marie-Thérèse » et « soeur marie therese » se retrouvent (ligatures œ/æ/ß,
+/// points, tirets et soulignés = espace).
 func normalize(_ s: String) -> String {
-    let folded = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
-    return folded.lowercased()
+    var out = s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
+        .lowercased()
+    for (ligature, plain) in [("œ", "oe"), ("æ", "ae"), ("ß", "ss")] {
+        out = out.replacingOccurrences(of: ligature, with: plain)
+    }
+    out = out.replacingOccurrences(of: "[._\\-]+", with: " ", options: .regularExpression)
+    return out.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
 }
 
 /// Libellé d'un tome : Tome 3, Intégrale 2, HS 1, Épisode 4… (même logique que l'interface web).
